@@ -42,9 +42,16 @@
   <div id="message" class="hidden"><div class="panel"><h2 id="messageTitle">YOU HEARD IT</h2><p id="messageText"></p><button id="continueBtn">Continue</button></div></div>
   <div id="gameover" class="hidden"><div class="panel"><h2 id="overTitle">IT FOUND YOU</h2><p id="overText">The hallway is quiet again.</p><button id="restartBtn">Try again</button></div></div>
 </div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+  }
+}
+</script>
 <script type="module">
-import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
-import {GLTFLoader} from 'https://unpkg.com/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+import {GLTFLoader} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x010101);
@@ -171,7 +178,29 @@ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updat
 renderer.domElement.addEventListener('click',()=>{if(started&&!dead)renderer.domElement.requestPointerLock();});
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===renderer.domElement;});
 
-document.querySelector('#startBtn').onclick=()=>{initAudio();started=true;document.querySelector('#start').classList.add('hidden');renderer.domElement.requestPointerLock();whisper('Find the fuses.');}
+function beginGame(e){
+  e?.preventDefault?.();
+  try {
+    initAudio();
+    started=true;
+    const start=document.querySelector('#start');
+    if(start) start.classList.add('hidden');
+    renderer.domElement.focus?.();
+    const lock=renderer.domElement.requestPointerLock?.();
+    if(lock && typeof lock.catch==='function') lock.catch(()=>{});
+    whisper('Find the fuses.');
+  } catch(err) {
+    console.error(err);
+    const el=document.querySelector('#message');
+    const title=document.querySelector('#messageTitle');
+    const msg=document.querySelector('#messageText');
+    if(el&&title&&msg){title.textContent='STARTUP ERROR';msg.textContent='The game could not start. Check the browser console for details.';el.classList.remove('hidden');}
+  }
+}
+const startBtn=document.querySelector('#startBtn');
+startBtn.addEventListener('click',beginGame);
+startBtn.addEventListener('pointerup',beginGame);
+startBtn.addEventListener('keydown',e=>{if(e.code==='Enter'||e.code==='Space')beginGame(e);});
 document.querySelector('#restartBtn').onclick=()=>location.reload();
 document.querySelector('#continueBtn').onclick=()=>document.querySelector('#message').classList.add('hidden');
 
