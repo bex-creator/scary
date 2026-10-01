@@ -27,18 +27,25 @@
   #objective{position:absolute;right:22px;top:20px;color:#aaa;font-size:13px;text-align:right;line-height:1.45}
   #whisper{position:absolute;left:50%;bottom:14%;transform:translateX(-50%);color:#bbb;font-size:14px;letter-spacing:.15em;opacity:0;text-shadow:0 0 14px #000;transition:opacity .3s}
   #bloodText{position:absolute;left:50%;top:72%;transform:translateX(-50%);font-size:16px;letter-spacing:.2em;color:#b40000;opacity:0;transition:opacity .12s;text-shadow:0 0 16px #300}
+
+  #flashBeamUI{position:fixed;inset:0;pointer-events:none;opacity:1;z-index:6;background:radial-gradient(ellipse at 50% 50%,rgba(255,255,255,.10) 0%,rgba(245,248,255,.06) 13%,rgba(255,255,255,.015) 31%,rgba(0,0,0,.12) 57%,rgba(0,0,0,.7) 100%);mix-blend-mode:screen;transition:opacity .12s}
+  #flashToggle{position:fixed;left:22px;bottom:22px;z-index:20;pointer-events:auto;background:rgba(10,10,12,.82);border:1px solid rgba(255,255,255,.18);color:#ddd;padding:10px 12px;font:12px Arial,sans-serif;letter-spacing:.12em;cursor:pointer;box-shadow:0 8px 30px rgba(0,0,0,.4);user-select:none}
+  #flashToggle.on{border-color:rgba(220,235,255,.55);box-shadow:0 0 22px rgba(220,235,255,.12),0 8px 30px rgba(0,0,0,.4)}
+  #flashToggle.off{color:#777}
   .hidden{display:none !important}
   .small{font-size:12px!important;color:#666!important}
 </style>
 </head>
 <body>
+<div id="flashBeamUI"></div>
+<div id="flashToggle" role="button" tabindex="0">FLASHLIGHT <b>F</b></div>
 <div id="game"></div>
 <div id="hud">
   <div id="reticle"></div><div id="vignette"></div><div id="red"></div><div id="fear"></div><div id="noise"></div>
   <div id="status">HEALTH 100% &nbsp;|&nbsp; FLASHLIGHT ON</div>
   <div id="objective">FUSES 0 / 3<br><span class="small">Find the exit.</span></div>
   <div id="whisper"></div><div id="bloodText">RUN</div>
-  <div id="start"><div class="panel"><h1>THE HOLLOW</h1><p>There is something alive in the lower levels.</p><p>Find the <b>three fuses</b>, restore the exit, and get out.</p><p class="small">WASD · mouse · SHIFT sprint · F flashlight · E interact</p><button id="startBtn">Enter the building</button></div></div>
+  <div id="start"><div class="panel"><h1>THE HOLLOW</h1><p>There is something alive in the lower levels.</p><p>Find the <b>three fuses</b>, restore the exit, and get out.</p><p class="small">WASD · mouse · SHIFT sprint · <b>F flashlight</b> · E interact</p><button id="startBtn">Enter the building</button></div></div>
   <div id="message" class="hidden"><div class="panel"><h2 id="messageTitle">YOU HEARD IT</h2><p id="messageText"></p><button id="continueBtn">Continue</button></div></div>
   <div id="gameover" class="hidden"><div class="panel"><h2 id="overTitle">IT FOUND YOU</h2><p id="overText">The hallway is quiet again.</p><button id="restartBtn">Try again</button></div></div>
 </div>
@@ -103,7 +110,29 @@ const door=box(0,2.25,-18,.9,4.5,.25,metal); door.userData.exit=true;
 const exitLight= new THREE.PointLight(0x660000,0,6); exitLight.position.set(0,4.8,-17.5); scene.add(exitLight);
 // ceiling lights
 for(let z=8;z>-22;z-=5){const L=new THREE.PointLight(0x666677,.55,8);L.position.set(0,5.7,z);scene.add(L); box(0,6.15,z,1.4,.08,.3,mat(0x55555a,.7));}
-const flashlight=new THREE.SpotLight(0xffffff,8,18,Math.PI/7,.65,1.6); flashlight.position.set(0,-.05,.02); flashlight.castShadow=true; camera.add(flashlight); camera.add(flashlight.target); flashlight.target.position.set(0,0,-5);
+// Handheld flashlight: visible in first person, with a strong cone beam.
+const flashlightRig=new THREE.Group();
+flashlightRig.position.set(.27,-.22,-.38);
+camera.add(flashlightRig);
+const flashlightBodyMat=new THREE.MeshStandardMaterial({color:0x171719,roughness:.32,metalness:.75});
+const flashlightBody=new THREE.Mesh(new THREE.CylinderGeometry(.075,.09,.42,16),flashlightBodyMat);
+flashlightBody.rotation.x=Math.PI/2;
+flashlightBody.position.z=.02;
+flashlightBody.rotation.z=-.10;
+flashlightBody.castShadow=true;
+flashlightRig.add(flashlightBody);
+const flashlightGrip=new THREE.Mesh(new THREE.CylinderGeometry(.09,.075,.18,16),new THREE.MeshStandardMaterial({color:0x0a0a0b,roughness:.7,metalness:.35}));
+flashlightGrip.rotation.x=Math.PI/2; flashlightGrip.position.z=.23; flashlightRig.add(flashlightGrip);
+const flashlightLens=new THREE.Mesh(new THREE.CylinderGeometry(.062,.068,.02,24),new THREE.MeshBasicMaterial({color:0xf7fbff}));
+flashlightLens.rotation.x=Math.PI/2; flashlightLens.position.z=-.20; flashlightRig.add(flashlightLens);
+const beamMat=new THREE.MeshBasicMaterial({color:0xeaf2ff,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+const beamCone=new THREE.Mesh(new THREE.ConeGeometry(2.35,14,48,1,true),beamMat);
+beamCone.rotation.x=Math.PI/2; beamCone.position.z=-7.05; flashlightRig.add(beamCone);
+const flashlight=new THREE.SpotLight(0xffffff,26,24,Math.PI/7,.58,1.1);
+flashlight.position.set(0,0,-.12); flashlight.castShadow=true; flashlight.shadow.mapSize.set(1024,1024); flashlightRig.add(flashlight);
+flashlight.target.position.set(0,0,-18); flashlightRig.add(flashlight.target);
+const flashlightFill=new THREE.PointLight(0xcfe0ff,3.5,6,1.7);
+flashlightFill.position.set(0,0,-.32); flashlightRig.add(flashlightFill);
 const ambient=new THREE.AmbientLight(0x202026,.12); scene.add(ambient);
 
 // Fuses / objectives
@@ -171,7 +200,27 @@ function interact(){
 }
 function fusesCountUpdate(){fuseCount = [0,1,2].filter(i=>fuses[i].userData.collected).length;document.querySelector('#objective').innerHTML=`FUSES ${fuseCount} / 3<br><span class="small">${fuseCount<3?'Find the exit.':'The exit is powered.'}</span>`;}
 
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyF'){flashOn=!flashOn;flashlight.intensity=flashOn?8:0;document.querySelector('#status').textContent=`HEALTH ${Math.max(0,Math.round(health))}%  |  FLASHLIGHT ${flashOn?'ON':'OFF'}`;}if(e.code==='KeyE')interact();});
+function setFlashlight(on){
+  flashOn=!!on;
+  flashlight.intensity=flashOn?26:0;
+  flashlightFill.intensity=flashOn?3.5:0;
+  beamMat.opacity=flashOn?.16:0;
+  flashlightLens.material.color.setHex(flashOn?0xf7fbff:0x25252a);
+  document.querySelector('#flashBeamUI').style.opacity=flashOn?'1':'0';
+  const ft=document.querySelector('#flashToggle');
+  ft.classList.toggle('on',flashOn); ft.classList.toggle('off',!flashOn);
+  ft.innerHTML=`FLASHLIGHT <b>${flashOn?'ON':'OFF'}</b> · F`;
+  document.querySelector('#status').textContent=`HEALTH ${Math.max(0,Math.round(health))}%  |  FLASHLIGHT ${flashOn?'ON':'OFF'}`;
+}
+function toggleFlashlight(){setFlashlight(!flashOn);if(audio)noiseBurst(.045,.018);}
+addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if((e.code==='KeyF'||e.key?.toLowerCase()==='f') && !e.repeat) toggleFlashlight();
+  if(e.code==='KeyE') interact();
+});
+const flashToggle=document.querySelector('#flashToggle');
+flashToggle.addEventListener('click',()=>{if(started&&!dead)toggleFlashlight();});
+flashToggle.addEventListener('keydown',e=>{if((e.code==='Enter'||e.code==='Space')&&!e.repeat){e.preventDefault();if(started&&!dead)toggleFlashlight();}});
 addEventListener('keyup',e=>keys[e.code]=false);
 addEventListener('mousemove',e=>{if(!locked||dead)return;yaw-=e.movementX*.0022;pitch-=e.movementY*.0018;pitch=Math.max(-1.35,Math.min(1.35,pitch));player.rotation.y=yaw;camera.rotation.x=pitch;});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
@@ -203,6 +252,7 @@ startBtn.addEventListener('pointerup',beginGame);
 startBtn.addEventListener('keydown',e=>{if(e.code==='Enter'||e.code==='Space')beginGame(e);});
 document.querySelector('#restartBtn').onclick=()=>location.reload();
 document.querySelector('#continueBtn').onclick=()=>document.querySelector('#message').classList.add('hidden');
+setFlashlight(true);
 
 function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);movePlayer(dt);updateMonster(dt);
  const d=distanceToMonster();
